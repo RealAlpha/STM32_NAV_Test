@@ -97,6 +97,8 @@ int main(void)
   HAL_Delay(5000);
   UpdateBaudRate(&huart1, 115200);
   HAL_UART_Transmit(&huart1, "115200!", strlen("115200!"), 1000);
+
+  PerformProtoNegotiation(&huart1, 9600, 115200);
   /* USER CODE END 2 */
 
   /* Infinite loop */

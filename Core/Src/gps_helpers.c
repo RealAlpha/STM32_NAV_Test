@@ -47,6 +47,44 @@ size_t GetPacketData(uint8_t MessageClass, uint8_t MessageID, uint8_t *payload,
 	return totLength;
 }
 
+void PerformProtoNegotiation(UART_HandleTypeDef *huart, unsigned int receiverBaudRate, unsigned int desiredBaudRate)
+{
+	// Change baudrate to the receiver's baudrate
+	// TODO: Perform some kind of BRR check to not change unnecessarily?
+	UpdateBaudRate(huart, receiverBaudRate);
+
+	// Generate the new port configuration
+	CFG_PRT NewPortConfig;
+	NewPortConfig.portID = 0x01; // UART port
+	NewPortConfig.reserved0 = 0b00000001; // Reserved - obtained from u-center's implementation
+	NewPortConfig.txReady = 0; // Not using any txReady features
+	NewPortConfig.mode = PRT_CFG_MODE_BASE | PRT_CFG_MODE_CHAR_LEN_8 | PRT_CFG_MODE_PARITY_NONE | PRT_CFG_MODE_STOPBITS_1;
+	NewPortConfig.baudRate = desiredBaudRate;
+	NewPortConfig.inProtoMask = PRT_CFG_PROTO_UBX;
+	NewPortConfig.outProtoMask = PRT_CFG_PROTO_UBX;
+	NewPortConfig.flags = PRT_CFG_FLAGS_NONE; // No need for an extended TX timeout
+
+	uint8_t packet[GET_PACKET_LENGTH(CFG_PRT)];
+	size_t ProducedSize = GetPacketData(MSG_CLASS_PRT, 0x00, (uint8_t*)&NewPortConfig, sizeof(NewPortConfig), packet, sizeof(packet));
+	if (ProducedSize == 0)
+	{
+		// Something went wrong creating the packet!
+		return;
+	}
+
+	// Send the generated PRT-CFG update packet (synchronously as we need to switch the backrate back afterwards)
+	HAL_StatusTypeDef UpdateResult = HAL_UART_Transmit(huart, packet, ProducedSize, 1000);
+	if (UpdateResult != HAL_OK)
+	{
+		// Something went wrong sending the packet
+		return;
+	}
+	// TODO: Listen for ACK(/NACK)? Also, might want to turn this into a boolean returning function
+
+	// Update the baudrate to the new one
+	UpdateBaudRate(huart, desiredBaudRate);
+;}
+
 void UpdateBaudRate(UART_HandleTypeDef *huart,
 		unsigned int newBaudRate) {
 
