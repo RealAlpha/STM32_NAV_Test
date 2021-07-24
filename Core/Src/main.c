@@ -22,7 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "gps_helpers.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -92,7 +92,11 @@ int main(void)
   MX_USART1_UART_Init();
   MX_DMA_Init();
   /* USER CODE BEGIN 2 */
-
+  UpdateBaudRate(&huart1, 9600);
+  HAL_UART_Transmit(&huart1, "9600!", strlen("9600!"), 1000);
+  HAL_Delay(5000);
+  UpdateBaudRate(&huart1, 115200);
+  HAL_UART_Transmit(&huart1, "115200!", strlen("115200!"), 1000);
   /* USER CODE END 2 */
 
   /* Infinite loop */
