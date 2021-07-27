@@ -56,7 +56,7 @@ void PerformProtoNegotiation(UART_HandleTypeDef *huart, unsigned int receiverBau
 {
 	// Change baudrate to the receiver's baudrate
 	// TODO: Perform some kind of BRR check to not change unnecessarily?
-	UpdateBaudRate(huart, receiverBaudRate);
+	UpdateBaudRate(huart, 10030);
 
 	// Generate the new port configuration
 	CFG_PRT NewPortConfig;
@@ -88,7 +88,7 @@ void PerformProtoNegotiation(UART_HandleTypeDef *huart, unsigned int receiverBau
 	// TODO: Listen for ACK(/NACK)? Also, might want to turn this into a boolean returning function
 
 	// Update the baudrate to the new one
-	UpdateBaudRate(huart, desiredBaudRate);
+	UpdateBaudRate(huart, 120361);
 
 	// Give the GPS module 500ms to make the change
 	HAL_Delay(500);

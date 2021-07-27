@@ -42,6 +42,7 @@
 /* Private variables ---------------------------------------------------------*/
 UART_HandleTypeDef huart1;
 DMA_HandleTypeDef hdma_usart1_rx;
+DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
 
@@ -50,8 +51,8 @@ DMA_HandleTypeDef hdma_usart1_rx;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_USART1_UART_Init(void);
 static void MX_DMA_Init(void);
+static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -89,15 +90,18 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_USART1_UART_Init();
   MX_DMA_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   ///HAL_UART_DMAPause(&huart1);
-  //PerformProtoNegotiation(&huart1, 9600, 115200);
-  //HAL_Delay(1000);
+  HAL_Delay(1000);
+  PerformProtoNegotiation(&huart1, 9600, 115200);
+  HAL_Delay(1000);
+
   ///HAL_UART_DMAResume(&huart1);
   //UpdateBaudRate(&huart1, 9600);
   HAL_Delay(1000);
+  HAL_UART_Transmit(&huart1, "Hello", strlen("Hello"), 1000);
   HAL_StatusTypeDef StartListenResult = HAL_UART_Receive_DMA(&huart1, Buffer, 256);
   //HAL_UARTEx_ReceiveToIdle_IT(&huart1, Buffer, GPS_BUFFER_SIZE);//HAL_UARTEx_ReceiveToIdle_DMA(&huart1, GPSBuffer, GPS_BUFFER_SIZE);
   /* USER CODE END 2 */
@@ -168,7 +172,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 1.0447*115200;
+  huart1.Init.BaudRate = 1.045*115200;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
@@ -198,6 +202,9 @@ static void MX_DMA_Init(void)
   /* DMA2_Stream2_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream2_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
+  /* DMA2_Stream7_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream7_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream7_IRQn);
 
 }
 
@@ -247,6 +254,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
 	uint32_t Error = HAL_UART_GetError(huart);
+	HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
 	//__HAL_UART_CLEAR_OREFLAG(huart);
 	//UNUSED(huart);
 }
