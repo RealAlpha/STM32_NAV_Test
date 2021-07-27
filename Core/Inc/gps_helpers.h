@@ -32,12 +32,13 @@
 #define PRT_CFG_MODE_STOPBITS_1 0b00000000000000000000000000000000
 #define PRT_CFG_MODE_CHAR_LEN_8 0b00000000000000000000000011000000
 //#define PRT_CFG_MODE_PARITY_NONE 0b00000000000000000000100000000000
-#define PRT_CFG_MODE_PARITY_NONE 0b100 << 11
+#define PRT_CFG_MODE_PARITY_NONE 0b100 << (11 - 2)
 #define PRT_CFG_PROTO_UBX 0b1
 #define PRT_CFG_FLAGS_NONE 0
 
 
-#define MSG_CLASS_PRT 0x06
+
+#define MSG_CLASS_CFG 0x06
 
 /**
  * Generates the bytes corresponding (including checksum et al) that can be sent to the UBX receiver.
@@ -74,6 +75,15 @@ void PerformProtoNegotiation(UART_HandleTypeDef *huart, unsigned int receiverBau
  */
 void UpdateBaudRate(UART_HandleTypeDef *huart, unsigned int newBaudRate);
 
+/**
+ * Processed the GPS buffer when a half, complete or idle timeout is detected on the GPS's serial connection
+ * @note This might update global states depending on the packets that come in
+ * @note To avoid overfilling the buffer, data is processed immediately, which might block the thread for some time.
+ *
+ * @param EndPos The Size/place in the buffer till where data is available.
+ */
+void ProcessGPSBuffer(uint16_t EndPos);
+
 //bool DecodePacket(uint8_t *packet, uint8_t packetMaxSize,  uint8_t &MessageClass, uint8_t &MessageID, size_t &payloadSize);
 
 
@@ -91,5 +101,48 @@ typedef struct {
 	uint16_t flags;
 	unsigned short reserved5;
 } CFG_PRT;
+
+typedef struct {
+	// Class of the message you'd like to change the rate of
+	unsigned char msgClass;
+	// ID of the message you'd like to change the rate of
+	unsigned char msgID;
+
+	// Every how many nav epochs the message should be sent
+	unsigned char rate;
+} CFG_MSG;
+
+
+/*
+ * Enums used for representing states/properties with a finite set of options
+ */
+// Keeps track of the parsing state
+typedef enum
+{
+	SEARCHING_SYNC_A,
+	SEARCHING_SYNC_B,
+	EXTRACT_CLASS_ID,
+	EXTRACT_MESSAGE_ID,
+	EXTRACT_PAYLOAD_LENGTH_A,
+	EXTRACT_PAYLOAD_LENGTH_B,
+	COPY_PAYLOAD,
+	EXTRACT_CHEKSUM_A,
+	EXTRACT_CHECKSUM_B,
+	VERIFY_CHECKSUM,
+	STATE_UNKNOWN
+} EParseState;
+
+
+/*
+ * Globals used for parsing and the like. It isn't ideal, but it might be the best we can do with C / without OOP
+ */
+// Number of bytes the (circular/DMA-filled) GPS buffer should have
+#define GPS_BUFFER_SIZE 256
+
+// The GPS buffer global that will be filled by incoming UART messages // used as a DMA circular buffer
+uint8_t GPSBuffer[GPS_BUFFER_SIZE];
+
+// The current position in the GPS buffer - considering everything before this position to have been previously parsed/no longer relevant
+unsigned int currentGPSBufferPosition;
 
 #endif /* INC_GPS_HELPERS_H_ */

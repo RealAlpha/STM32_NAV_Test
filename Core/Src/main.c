@@ -58,7 +58,7 @@ static void MX_DMA_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+uint8_t Buffer[256];
 /* USER CODE END 0 */
 
 /**
@@ -92,13 +92,14 @@ int main(void)
   MX_USART1_UART_Init();
   MX_DMA_Init();
   /* USER CODE BEGIN 2 */
-  UpdateBaudRate(&huart1, 9600);
-  HAL_UART_Transmit(&huart1, "9600!", strlen("9600!"), 1000);
-  HAL_Delay(5000);
-  UpdateBaudRate(&huart1, 115200);
-  HAL_UART_Transmit(&huart1, "115200!", strlen("115200!"), 1000);
-
-  PerformProtoNegotiation(&huart1, 9600, 115200);
+  ///HAL_UART_DMAPause(&huart1);
+  //PerformProtoNegotiation(&huart1, 9600, 115200);
+  //HAL_Delay(1000);
+  ///HAL_UART_DMAResume(&huart1);
+  //UpdateBaudRate(&huart1, 9600);
+  HAL_Delay(1000);
+  HAL_StatusTypeDef StartListenResult = HAL_UART_Receive_DMA(&huart1, Buffer, 256);
+  //HAL_UARTEx_ReceiveToIdle_IT(&huart1, Buffer, GPS_BUFFER_SIZE);//HAL_UARTEx_ReceiveToIdle_DMA(&huart1, GPSBuffer, GPS_BUFFER_SIZE);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -167,7 +168,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 1.0447968*115200;
+  huart1.Init.BaudRate = 1.0447*115200;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
@@ -207,14 +208,48 @@ static void MX_DMA_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : LED1_Pin */
+  GPIO_InitStruct.Pin = LED1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(LED1_GPIO_Port, &GPIO_InitStruct);
+
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+}
+void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart)
+{
+	HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+}
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+{
+	// Is this message relevant to the UART connenction used for GPS traffic? If so, pass it along to the GPS handler for further processinng.
+	// NOTE: Assuming only one (global) huart instance exists -> the address will be the same, and functions as an equals check between the two objects.
+	if (huart == &huart1)
+	{
+		ProcessGPSBuffer(Size);
+	}
+}
 
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+	uint32_t Error = HAL_UART_GetError(huart);
+	//__HAL_UART_CLEAR_OREFLAG(huart);
+	//UNUSED(huart);
+}
 /* USER CODE END 4 */
 
 /**
