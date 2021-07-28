@@ -101,8 +101,7 @@ int main(void)
   ///HAL_UART_DMAResume(&huart1);
   //UpdateBaudRate(&huart1, 9600);
   HAL_Delay(1000);
-  HAL_UART_Transmit(&huart1, "Hello", strlen("Hello"), 1000);
-  HAL_StatusTypeDef StartListenResult = HAL_UART_Receive_DMA(&huart1, Buffer, 256);
+  HAL_StatusTypeDef StartListenResult = HAL_UARTEx_ReceiveToIdle_DMA(&huart1, GPSBuffer, GPS_BUFFER_SIZE);
   //HAL_UARTEx_ReceiveToIdle_IT(&huart1, Buffer, GPS_BUFFER_SIZE);//HAL_UARTEx_ReceiveToIdle_DMA(&huart1, GPSBuffer, GPS_BUFFER_SIZE);
   /* USER CODE END 2 */
 

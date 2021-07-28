@@ -137,7 +137,7 @@ typedef enum
  * Globals used for parsing and the like. It isn't ideal, but it might be the best we can do with C / without OOP
  */
 // Number of bytes the (circular/DMA-filled) GPS buffer should have
-#define GPS_BUFFER_SIZE 256
+#define GPS_BUFFER_SIZE 2048
 
 // The GPS buffer global that will be filled by incoming UART messages // used as a DMA circular buffer
 uint8_t GPSBuffer[GPS_BUFFER_SIZE];

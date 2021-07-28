@@ -12,6 +12,9 @@
 // Ensure we start parsing the buffer at the start, but also avoid multiple definitions issues when placing default in the header
 unsigned int currentGPSBufferPosition = 0;
 
+
+uint8_t GPSBuffer[GPS_BUFFER_SIZE] = {'\0'};
+
 size_t GetPacketData(uint8_t MessageClass, uint8_t MessageID, uint8_t *payload,
 		uint16_t payloadSize, uint8_t *buffer, size_t bufferSize) {
 	// Calculate the total packet length to ensure that it will fit in the buffer
@@ -211,12 +214,12 @@ void ProcessGPSBuffer(uint16_t EndPos)
 		// Assume GPS and STM32 chip are both LSB -> that means that the first byte (of the 16-bit length)
 		// should be shifted over by 8 bits, and the second byte should just be OR-ed "on" to it
 		case EXTRACT_PAYLOAD_LENGTH_A:
-			PayloadLength = GPSBuffer[parsePos % GPS_BUFFER_SIZE] << 8;
+			PayloadLength = GPSBuffer[parsePos % GPS_BUFFER_SIZE];// << 8;
 			parseState = EXTRACT_PAYLOAD_LENGTH_B;
 			CK_A += GPSBuffer[parsePos % GPS_BUFFER_SIZE]; CK_B += CK_A;
 			break;
 		case EXTRACT_PAYLOAD_LENGTH_B:
-			PayloadLength |= GPSBuffer[parsePos % GPS_BUFFER_SIZE];
+			PayloadLength |= GPSBuffer[parsePos % GPS_BUFFER_SIZE] << 8;
 			parseState = COPY_PAYLOAD;
 			CK_A += GPSBuffer[parsePos % GPS_BUFFER_SIZE]; CK_B += CK_A;
 			break;
@@ -238,6 +241,9 @@ void ProcessGPSBuffer(uint16_t EndPos)
 			if ((parsePos + PayloadLength + 2) % GPS_BUFFER_SIZE >= EndPos || (parsePos + PayloadLength + 2 - currentGPSBufferPosition) > GPS_BUFFER_SIZE)
 			{
 				parseState = SEARCHING_SYNC_A;
+				PayloadLength = 0;
+				CK_A = 0;
+				CK_B = 0;
 				goto parse_end;
 			}
 
@@ -250,19 +256,28 @@ void ProcessGPSBuffer(uint16_t EndPos)
 
 			// Ensure the checksum matches the CK_A/CK_B bytes provided in the packet.
 			// NOTE: Earlier length check ensures the buffer is this long/we can just index them
+			// TODO: Add this back!
+
 			if (CK_A != GPSBuffer[(parsePos + PayloadLength) % GPS_BUFFER_SIZE] || CK_A != GPSBuffer[(parsePos + PayloadLength + 1) % GPS_BUFFER_SIZE])
 			{
 				// The checksum failed! Since the whole buffer is available, we will consider the whole packet to be corrupted and skip over it.
 				// TODO: We currently don't really "skip" over it, but continue lookingn for a syncn patternn (which could be half way through the packet)
 				//       Is this inndeed the desired behavior, or should we just increase parsePos to the end of the parsed packet size?
+				parseState = SEARCHING_SYNC_A;
+				PayloadLength = 0;
+				CK_A = 0;
+				CK_B = 0;
 				goto parse_end;
 			}
-
 			// The packet passed all checks and is valid! Attempt to match it to a known message identifier
 			// TODO: Implement this
 			HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
 			parsePos += PayloadLength + 1;
 			currentGPSBufferPosition = parsePos % GPS_BUFFER_SIZE;
+			parseState = SEARCHING_SYNC_A;
+			PayloadLength = 0;
+			CK_A = 0;
+			CK_B = 0;
 			continue;
 			break;
 
