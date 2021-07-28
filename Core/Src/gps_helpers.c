@@ -155,6 +155,8 @@ void UpdateBaudRate(UART_HandleTypeDef *huart,
 
 void ProcessGPSBuffer(uint16_t EndPos)
 {
+	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
+
 	// NOTE: Written for a single-core system, and assuming interrupts requiring the data happen.
 	// TODO: Re-evaluate this/possibly implement locking in the future.
 
@@ -206,7 +208,7 @@ void ProcessGPSBuffer(uint16_t EndPos)
 			break;
 		case EXTRACT_MESSAGE_ID:
 			// This byte represents the message ID
-			ClassID = GPSBuffer[parsePos % GPS_BUFFER_SIZE];
+			MessageID = GPSBuffer[parsePos % GPS_BUFFER_SIZE];
 			parseState = EXTRACT_PAYLOAD_LENGTH_A;
 			CK_A += GPSBuffer[parsePos % GPS_BUFFER_SIZE]; CK_B += CK_A;
 			break;
@@ -256,13 +258,11 @@ void ProcessGPSBuffer(uint16_t EndPos)
 
 			// Ensure the checksum matches the CK_A/CK_B bytes provided in the packet.
 			// NOTE: Earlier length check ensures the buffer is this long/we can just index them
-			// TODO: Add this back!
-
 			if (CK_A != GPSBuffer[(parsePos + PayloadLength) % GPS_BUFFER_SIZE] || CK_B != GPSBuffer[(parsePos + PayloadLength + 1) % GPS_BUFFER_SIZE])
 			{
 				// The checksum failed! Since the whole buffer is available, we will consider the whole packet to be corrupted and skip over it.
-				// TODO: We currently don't really "skip" over it, but continue lookingn for a syncn patternn (which could be half way through the packet)
-				//       Is this inndeed the desired behavior, or should we just increase parsePos to the end of the parsed packet size?
+				// TODO: We currently don't really "skip" over it, but continue looking for a sync pattern (which could be half way through the packet)
+				//       Is this indeed the desired behavior, or should we just increase parsePos to the end of the parsed packet size?
 				parseState = SEARCHING_SYNC_A;
 				PayloadLength = 0;
 				CK_A = 0;
@@ -270,15 +270,35 @@ void ProcessGPSBuffer(uint16_t EndPos)
 				goto parse_end;
 			}
 			// The packet passed all checks and is valid! Attempt to match it to a known message identifier
-			// TODO: Implement this
-			HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
+			// TODO: Find a way to improve this that does not involve three nested switches (and in general for this class, not massive chunks of code in switches? Maybe combine ifs + switches for the last level?)
+			switch(ClassID)
+			{
+			case MSG_CLASS_NAV:
+				switch(MessageID)
+				{
+				case 0x07:
+					// NAV-PVT packet
+					if (sizeof(NAV_PVT) != PayloadLength)
+					{
+						// Payload size does not match the expected packet! Something went wrong, but skip over it since the checksum did match
+						break;
+					}
+					// Copy over the payload directly into the struct - this is possible because the struct is a 1:1 match with the payload.
+					// NOTE: Might want to only include the "relevant" attributes or potentially even do further processing, but that might not be best suited for an interrupt./
+					memcpy(&lastNavFix, &GPSBuffer[parsePos], PayloadLength);
+					break;
+				}
+				break;
+			default:
+				// Not currently parsing this message! Just skip over it, as we don't want to hang up processing over a message we don't case about
+				break;
+			}
 			parsePos += PayloadLength + 1;
 			currentGPSBufferPosition = parsePos % GPS_BUFFER_SIZE;
 			parseState = SEARCHING_SYNC_A;
 			PayloadLength = 0;
 			CK_A = 0;
 			CK_B = 0;
-			continue;
 			break;
 
 		}
@@ -287,5 +307,8 @@ parse_end:
 		parsePos++;
 
 	}
+
+
+	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
 
 }

@@ -37,7 +37,14 @@
 #define PRT_CFG_FLAGS_NONE 0
 
 
+// Various NAV-PVT field flags. Currently only defined "relevant" ones
+#define NAV_PVT_VALIDITY_FULLYRESOLVED 0b1 << 2
+#define NAV_PVT_VALIDITY_VALIDTIME 0b1 << 1
+#define NAV_PVT_VALIDITY_VALIDDATE 0b1 << 0
+#define NAV_PVT_FLAGS_OKFIX 0b1 << 0
 
+
+#define MSG_CLASS_NAV 0x01
 #define MSG_CLASS_CFG 0x06
 
 
@@ -130,6 +137,46 @@ typedef struct {
 	UBX_U1 rate;
 } CFG_MSG;
 
+typedef struct {
+	UBX_U4 iTOW; // GPS time of week in miliseconds
+	UBX_U2 year; // Current year (in Zulu)
+	UBX_U1 month; // Current month (in Zulu)
+	UBX_U1 day; // Current day (in Zulu)
+	UBX_U1 hour; // Current hour (in Zulu)
+	UBX_U1 min; // Current minute (in Zulu)
+	UBX_U1 sec; // Current second (in Zulu)
+
+	UBX_X1 valid; // TODO
+	UBX_U4 tAcc; // Time accuracy in nanoseconds
+	UBX_I4 nano; // Current nanosecond "compensation" - could be + or - (in Zulu)
+	UBX_X1 flags; // TODO
+	UBX_U1 reserved1; // Reserved
+
+	UBX_U1 numSV; // Number of sats used in NAV solution
+
+	UBX_I4 lon; // Current longitude in 10^-7 degrees
+	UBX_I4 lat; // Current latitude in 10^-7 degrees
+	UBX_I4 height; // Height above ellipsoid model measured in millimetres
+	UBX_I4 hMSL; // Height above the mean sea level(/equipotential surface?) in millimeters
+
+	UBX_U4 hAcc; // Horizontal (NOT height) measurement accuracy estimate in mm
+	UBX_U4 vAcc; // Vertical measurement accuracy estimate in mm
+
+	UBX_I4 velN; // Velocity in the North direction in mm/s (NED model)
+	UBX_I4 velE; // Velocity in the East direction in mm/s (NED model)
+	UBX_I4 velD; // Velocity in the Down direction in mm/s (NED model)
+	UBX_I4 gSpeed; // 2D ground speed in mm/s
+	UBX_I4 heading; // Current heading in 10^-5 degrees
+
+	UBX_U4 sAcc; // Speed measurement accuracy estimate in mm/s
+	UBX_U4 headingAcc; // Heading accueracy estimate in 10^-5 degrees
+
+	UBX_U2 pDOP; // Position DOP scaled to 0.01/count
+
+	UBX_X2 reserved2; // Reserved
+	UBX_U4 reserved3; // Reserved
+} NAV_PVT;
+
 
 /*
  * Enums used for representing states/properties with a finite set of options
@@ -162,5 +209,10 @@ uint8_t GPSBuffer[GPS_BUFFER_SIZE];
 
 // The current position in the GPS buffer - considering everything before this position to have been previously parsed/no longer relevant
 unsigned int currentGPSBufferPosition;
+
+/*
+ * Global state variables. Again, not ideal but probably the best way to implement "background"/interrupt-based processing without using C++/OOP.
+ */
+NAV_PVT lastNavFix;
 
 #endif /* INC_GPS_HELPERS_H_ */
