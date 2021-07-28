@@ -258,7 +258,7 @@ void ProcessGPSBuffer(uint16_t EndPos)
 			// NOTE: Earlier length check ensures the buffer is this long/we can just index them
 			// TODO: Add this back!
 
-			if (CK_A != GPSBuffer[(parsePos + PayloadLength) % GPS_BUFFER_SIZE] || CK_A != GPSBuffer[(parsePos + PayloadLength + 1) % GPS_BUFFER_SIZE])
+			if (CK_A != GPSBuffer[(parsePos + PayloadLength) % GPS_BUFFER_SIZE] || CK_B != GPSBuffer[(parsePos + PayloadLength + 1) % GPS_BUFFER_SIZE])
 			{
 				// The checksum failed! Since the whole buffer is available, we will consider the whole packet to be corrupted and skip over it.
 				// TODO: We currently don't really "skip" over it, but continue lookingn for a syncn patternn (which could be half way through the packet)
