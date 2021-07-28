@@ -149,6 +149,8 @@ typedef struct {
 	UBX_X1 valid; // TODO
 	UBX_U4 tAcc; // Time accuracy in nanoseconds
 	UBX_I4 nano; // Current nanosecond "compensation" - could be + or - (in Zulu)
+	// ???
+	UBX_U1 fixType;
 	UBX_X1 flags; // TODO
 	UBX_U1 reserved1; // Reserved
 
@@ -202,7 +204,7 @@ typedef enum
  * Globals used for parsing and the like. It isn't ideal, but it might be the best we can do with C / without OOP
  */
 // Number of bytes the (circular/DMA-filled) GPS buffer should have
-#define GPS_BUFFER_SIZE 256
+#define GPS_BUFFER_SIZE 512
 
 // The GPS buffer global that will be filled by incoming UART messages // used as a DMA circular buffer
 uint8_t GPSBuffer[GPS_BUFFER_SIZE];
