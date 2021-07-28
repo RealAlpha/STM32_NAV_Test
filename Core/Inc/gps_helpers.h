@@ -40,6 +40,23 @@
 
 #define MSG_CLASS_CFG 0x06
 
+
+
+/*
+ * Data types used in the UBX protocol description. Makes it easier to copy stuff from the docs
+ */
+#define UBX_U1 unsigned char
+#define UBX_I1 char
+#define UBX_X1 uint8_t
+#define UBX_U2 unsigned short
+#define UBX_I2 short
+#define UBX_X2 uint16_t
+#define UBX_U4 unsigned long
+#define UBX_I4 long
+#define UBX_X4 uint32_t
+
+
+
 /**
  * Generates the bytes corresponding (including checksum et al) that can be sent to the UBX receiver.
  *
@@ -91,25 +108,26 @@ void ProcessGPSBuffer(uint16_t EndPos);
  * Structures representing common requests/updates/responses to and from the UBX receiver
  */
 typedef struct {
-	unsigned char portID;
-	unsigned char reserved0;
-	uint16_t txReady;
-	uint32_t mode;
-	unsigned int baudRate;
-	uint16_t inProtoMask;
-	uint16_t outProtoMask;
-	uint16_t flags;
-	unsigned short reserved5;
+	UBX_U1 portID;
+	UBX_U1 reserved0;
+	UBX_X2 txReady;
+	UBX_X4 mode;
+	UBX_I4 baudRate;
+	UBX_X2 inProtoMask;
+	UBX_X2 outProtoMask;
+	UBX_X2 flags;
+	UBX_U2 reserved5;
 } CFG_PRT;
 
 typedef struct {
 	// Class of the message you'd like to change the rate of
-	unsigned char msgClass;
+	UBX_U1 msgClass;
+
 	// ID of the message you'd like to change the rate of
-	unsigned char msgID;
+	UBX_U1 msgID;
 
 	// Every how many nav epochs the message should be sent
-	unsigned char rate;
+	UBX_U1 rate;
 } CFG_MSG;
 
 
@@ -137,7 +155,7 @@ typedef enum
  * Globals used for parsing and the like. It isn't ideal, but it might be the best we can do with C / without OOP
  */
 // Number of bytes the (circular/DMA-filled) GPS buffer should have
-#define GPS_BUFFER_SIZE 2048
+#define GPS_BUFFER_SIZE 256
 
 // The GPS buffer global that will be filled by incoming UART messages // used as a DMA circular buffer
 uint8_t GPSBuffer[GPS_BUFFER_SIZE];
