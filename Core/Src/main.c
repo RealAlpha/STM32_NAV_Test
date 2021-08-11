@@ -23,7 +23,9 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "gps_helpers.h"
+#include "imu_helpers.h"
 #include <math.h>
+#include <stdarg.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -111,6 +113,8 @@ int main(void)
   HAL_Delay(1000);
   HAL_StatusTypeDef StartListenResult = HAL_UARTEx_ReceiveToIdle_DMA(&huart1, GPSBuffer, GPS_BUFFER_SIZE);
   //HAL_UARTEx_ReceiveToIdle_IT(&huart1, Buffer, GPS_BUFFER_SIZE);//HAL_UARTEx_ReceiveToIdle_DMA(&huart1, GPSBuffer, GPS_BUFFER_SIZE);
+
+  PerformImuConfiguration(&hi2c1, 3200, 3200);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -130,6 +134,22 @@ int main(void)
 		  HAL_UART_Transmit(&huart2, "NO FIX!\n", strlen("NO FIX!\n"), 100);
 		  HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
 	  }
+
+	  if (imuUpdateFlag & ACCEL_AVAILABLE_FLAG)
+	  {
+		  vector3f AccelData = GetAccelData();
+		  char buffer[4096];
+		  sprintf(buffer, "Accel available! gx: %f, gy: %f, gz: %f", AccelData.x, AccelData.y, AccelData.z);
+		  HAL_UART_Transmit(&huart2, buffer, strlen(buffer), 1000);
+		  ////LogDebugMessage("Accel available! gx: %f, gy: %f, gz: %f", AccelData.x, AccelData.y, AccelData.z);
+		  // Clear the flag
+		  imuUpdateFlag &= ~ACCEL_AVAILABLE_FLAG;
+	  }
+	  else
+	  {
+		  LogDebugMessage("Accel not available!");
+	  }
+
 	  HAL_Delay(1000);
     /* USER CODE END WHILE */
 
@@ -193,7 +213,7 @@ static void MX_I2C1_Init(void)
 
   /* USER CODE END I2C1_Init 1 */
   hi2c1.Instance = I2C1;
-  hi2c1.Init.ClockSpeed = 100000;
+  hi2c1.Init.ClockSpeed = 400000;
   hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
   hi2c1.Init.OwnAddress1 = 0;
   hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
@@ -319,6 +339,16 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : ACCEL_INT_Pin */
+  GPIO_InitStruct.Pin = ACCEL_INT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(ACCEL_INT_GPIO_Port, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI1_IRQn);
+
 }
 
 /* USER CODE BEGIN 4 */
@@ -346,6 +376,50 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 	HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
 	//__HAL_UART_CLEAR_OREFLAG(huart);
 	//UNUSED(huart);
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	// TODO: Check IQn and/or port - pretty much, make sure this is indeed the iterrupt we want
+	if (GPIO_Pin == ACCEL_INT_Pin)
+	{
+		HandleAccelInterrupt();
+	}
+//	else if (GPIO_Pin == GYRO_INT_Pin)
+//	{
+//
+//	}
+}
+
+void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+	// TODO: Implemet I2C checks (i.e. make sure it only triggers for hi2c1, not the others)
+	HandleI2CInterrupt(hi2c);
+}
+
+/**
+ * Simple debug print function that dumps the result to the serial. Limited to at most 2047 characters and suffixes a \n by default.
+ * @param fmt The format string.
+ */
+void LogDebugMessage(char *fmt, ...)
+{
+	// TODO: Does not appear to work well with multiple floats - that will need to be fixed!
+	// TODO: Replace hard-coded buffer size?
+	char buffer[2048];
+
+	va_list argp;
+	va_start(argp, fmt);
+	int charsWritten = vsnprintf(buffer, 2048, fmt, argp);
+	va_end(argp);
+
+	// Ensure the formatting was successful
+	if (charsWritten < 2048 && charsWritten > 0)
+	{
+		// NOTE: We don't really care about the \0, but we do want to make sure the serial newlines after each message
+		buffer[charsWritten] = '\n';
+		// OTE: The +1 ensures the \n is transmitted as well
+		HAL_UART_Transmit/*_IT*/(&huart2, buffer, charsWritten+1, 1000);
+	}
 }
 /* USER CODE END 4 */
 
