@@ -138,6 +138,17 @@ typedef struct {
 } CFG_MSG;
 
 typedef struct {
+	// The number of millisecondsd between GNSS measurements
+	UBX_U2 measRate;
+
+	// Must be set to 1 per the UBX spec
+	UBX_U2 navRate;
+
+	// Reference time souce; 0=UTC,1=GPS
+	UBX_U2 timeRef;
+} CFG_RATE;
+
+typedef struct {
 	UBX_U4 iTOW; // GPS time of week in miliseconds
 	UBX_U2 year; // Current year (in Zulu)
 	UBX_U1 month; // Current month (in Zulu)

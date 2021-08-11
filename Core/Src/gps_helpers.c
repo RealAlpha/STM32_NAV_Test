@@ -109,6 +109,22 @@ void PerformProtoNegotiation(UART_HandleTypeDef *huart, unsigned int receiverBau
 		// Something went wrong sending the packet
 		return;
 	}
+
+	// Configure the navigation rate to it's max frequency (10Hz according to the datasheet)
+	// TODO: Turn into param +
+	HAL_Delay(500);
+	CFG_RATE NewRateConfig;
+	NewRateConfig.measRate = 100;
+	NewRateConfig.navRate = 1;
+	NewRateConfig.timeRef = 1;
+	uint8_t ratePacket[GET_PACKET_LENGTH(CFG_RATE)];
+	size_t rateProducedSize = GetPacketData(MSG_CLASS_CFG, 0x08, (uint8_t*)&NewRateConfig, sizeof(NewRateConfig), ratePacket, sizeof(ratePacket));
+	UpdateResult = HAL_UART_Transmit(huart, ratePacket, rateProducedSize, 1000);
+	if (UpdateResult != HAL_OK)
+	{
+		// Something went wrong sending the packet
+		return;
+	}
 }
 
 void UpdateBaudRate(UART_HandleTypeDef *huart,
