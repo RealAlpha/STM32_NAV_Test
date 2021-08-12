@@ -11,6 +11,7 @@ void PerformImuConfiguration(I2C_HandleTypeDef *hi2c, uint16_t AccelRate, uint16
 {
 	imuI2CHandle = hi2c;
 
+	// Initialize the accelerometer
 	uint8_t POWER_CTL_STOP = 0;
 	uint8_t POWER_CTL_START = 0b00001000;
 	uint8_t DATA_FORMAT = 0b00001000;
@@ -25,6 +26,20 @@ void PerformImuConfiguration(I2C_HandleTypeDef *hi2c, uint16_t AccelRate, uint16
 	HAL_I2C_Mem_Write(imuI2CHandle, ADXL345_ADDR, 0x2E, 1, &INT_ENABLE, 1, 1000);
 	HAL_I2C_Mem_Write(imuI2CHandle, ADXL345_ADDR, 0x2D, 1, &POWER_CTL_START, 1, 1000);
 
+
+	HAL_Delay(1);
+	// Initialize the gyro
+	uint8_t GyroDLPF = 0b00011000;
+	uint8_t GyroSMPLRT_DIV = 4; // (8*10^3)/1600 - 1; opted for 1600 since 3200 did not produce a whole/integer divisor
+	// NOTE: Choosing 50us pulse to avoid issue similar to ADXL345 where it can get "stuck" on subsequent runs
+	uint8_t GyroInterruptConfig = 0b00010001;uint8_t GyroStatus[0x3F];
+	HAL_StatusTypeDef GyroStatusResult = HAL_I2C_Mem_Read(imuI2CHandle, GYRO_ADDR, 0x00, 1, &GyroStatus, 0x3F, 1000);
+	HAL_StatusTypeDef GyroSampleRateResult = HAL_I2C_Mem_Write(imuI2CHandle, GYRO_ADDR, 0x15, 1, &GyroSMPLRT_DIV, 1, 1000);
+	HAL_StatusTypeDef GyroInterruptResult = HAL_I2C_Mem_Write(imuI2CHandle, GYRO_ADDR, 0x17, 1, &GyroInterruptConfig, 1, 1000);
+	HAL_StatusTypeDef GyroEnableResult = HAL_I2C_Mem_Write(imuI2CHandle, GYRO_ADDR, 0x16, 1, &GyroDLPF, 1, 1000);
+
+
+
 	// Force-handle interrupt to avoid staying HIGH; TODO: only trigger when it was low?
 	HandleAccelInterrupt();
 	//HAL_GPIO_ReadPin(GPIOx, GPIO_Pin)
@@ -34,17 +49,16 @@ void PerformImuConfiguration(I2C_HandleTypeDef *hi2c, uint16_t AccelRate, uint16
 void HandleAccelInterrupt()
 {
 	// TODO: Switch interrupts? Now we're assuming the only interrupt source is that data is available
-	// TODO: Make hi2c configurable
 	internalStateFlags |= ACCEL_AWAITING_I2C;
 	HAL_I2C_Mem_Read_IT(imuI2CHandle, ADXL345_ADDR, 0x32, 1, accelDataBuffer, 6);
-
-
-	// NOTE: Not handling conversion here to avoid wasting CPU cycles inside of an interrupt + not 100% sure if FPU can be used from interrupt
-	//	  float ax_conv = (float)x * 4E-3;
-	//	  float ay_conv = (float)y * 4E-3;
-	//	  float az_conv = (float)z * 4E-3;
 }
 
+void HandleGyroInterrupt()
+{
+	// TODO: Switch interrupts? Now we're assuming the only interrupt source is that data is available
+	internalStateFlags |= GYRO_AWAITING_I2C;
+	HAL_I2C_Mem_Read_IT(imuI2CHandle, GYRO_ADDR, 0x1D, 1, gyroDataBuffer, 6);
+}
 
 void HandleI2CInterrupt(I2C_HandleTypeDef *hi2c)
 {
@@ -61,6 +75,19 @@ void HandleI2CInterrupt(I2C_HandleTypeDef *hi2c)
 		// Clear flag
 		internalStateFlags &= ~ACCEL_AWAITING_I2C;
 	}
+	else if (internalStateFlags & GYRO_AWAITING_I2C)
+	{
+		//TODO: Implement some form of mutex/locking to ensure we are't currently reading?
+		gyroRatesRaw.x = (((int)gyroDataBuffer[0] << 8) | gyroDataBuffer[1]);
+		gyroRatesRaw.y = (((int)gyroDataBuffer[2] << 8) | gyroDataBuffer[3]);
+		gyroRatesRaw.z = (((int)gyroDataBuffer[4] << 8) | gyroDataBuffer[5]);
+
+		// Make it known that an update is available
+		imuUpdateFlag |= GYRO_AVAILABLE_FLAG;
+
+		// Clear flag
+		internalStateFlags &= ~GYRO_AWAITING_I2C;
+	}
 }
 
 vector3f GetAccelData()
@@ -75,4 +102,17 @@ vector3f GetAccelData()
 	imuUpdateFlag &= ~ACCEL_AVAILABLE_FLAG;
 
 	return accelMeas;
+}
+
+vector3f GetGyroData()
+{
+	// Convert the measurements into deg/s
+	gyroRates.x = (float)gyroRatesRaw.x / 14.375f;
+	gyroRates.y = (float)gyroRatesRaw.y / 14.375f;
+	gyroRates.z = (float)gyroRatesRaw.z / 14.375f;
+
+	// Clear the gyro update available flag if it was set
+	imuUpdateFlag &= ~GYRO_AVAILABLE_FLAG;
+
+	return gyroRates;
 }

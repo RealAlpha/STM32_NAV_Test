@@ -30,10 +30,10 @@
 // TODO: Remove/superceded by function - or should we set these if we need the data multiple times between updates?
 vector3f accelMeas;
 vector3f gyroRates;
-bool imuUpdateFlag;
+uint8_t imuUpdateFlag;
 
 // Internal state - used for communication between various IRQ handlers
-bool internalStateFlags;
+uint8_t internalStateFlags;
 /// Raw data values to avoid having to call the FPU/perform conversion steps during interrupts. Currently does convert into the integer representation, but I suppoose that even that could be changed
 vector3i16 accelMeasRaw;
 vector3i16 gyroRatesRaw;
@@ -52,6 +52,7 @@ I2C_HandleTypeDef *imuI2CHandle;
 void PerformImuConfiguration(I2C_HandleTypeDef *hi2c, uint16_t AccelRate, uint16_t GyroRate);
 
 void HandleAccelInterrupt();
+void HandleGyroInterrupt();
 
 void HandleI2CInterrupt(I2C_HandleTypeDef *hi2c);
 
@@ -59,5 +60,10 @@ void HandleI2CInterrupt(I2C_HandleTypeDef *hi2c);
  * Returns the latest accelerometer data, converted to g's
  */
 vector3f GetAccelData();
+
+/*
+ * Returns the latest gyroscope data, converted to deg/s
+ */
+vector3f GetGyroData();
 
 #endif /* IMU_HELPERS_H_ */

@@ -114,6 +114,31 @@ int main(void)
   HAL_StatusTypeDef StartListenResult = HAL_UARTEx_ReceiveToIdle_DMA(&huart1, GPSBuffer, GPS_BUFFER_SIZE);
   //HAL_UARTEx_ReceiveToIdle_IT(&huart1, Buffer, GPS_BUFFER_SIZE);//HAL_UARTEx_ReceiveToIdle_DMA(&huart1, GPSBuffer, GPS_BUFFER_SIZE);
 
+/*
+  uint8_t Buffer[25] = {0};
+  uint8_t Space[] = " - ";
+  uint8_t StartMSG[] = "Starting I2C Scanning: \r\n";
+  uint8_t EndMSG[] = "Done! \r\n\r\n";
+  HAL_UART_Transmit(&huart2, StartMSG, sizeof(StartMSG), 10000);
+  uint8_t i = 0, ret;
+      for(i=1; i<128; i++)
+      {
+          ret = HAL_I2C_IsDeviceReady(&hi2c1, (uint16_t)(i<<1), 3, 5);
+          if (ret != HAL_OK) // No ACK Received At That Address
+          {
+              HAL_UART_Transmit(&huart2, Space, sizeof(Space), 10000);
+          }
+          else if(ret == HAL_OK)
+          {
+              sprintf(Buffer, "0x%X", i);
+              HAL_UART_Transmit(&huart2, Buffer, sizeof(Buffer), 10000);
+          }
+      }
+      HAL_UART_Transmit(&huart2, EndMSG, sizeof(EndMSG), 10000);
+      //--[ Scanning Done ]--
+*/
+
+
   PerformImuConfiguration(&hi2c1, 3200, 3200);
   /* USER CODE END 2 */
 
@@ -139,7 +164,7 @@ int main(void)
 	  {
 		  vector3f AccelData = GetAccelData();
 		  char buffer[4096];
-		  sprintf(buffer, "Accel available! gx: %f, gy: %f, gz: %f", AccelData.x, AccelData.y, AccelData.z);
+		  sprintf(buffer, "Accel available! x: %f, y: %f, z: %f\n", AccelData.x, AccelData.y, AccelData.z);
 		  HAL_UART_Transmit(&huart2, buffer, strlen(buffer), 1000);
 		  ////LogDebugMessage("Accel available! gx: %f, gy: %f, gz: %f", AccelData.x, AccelData.y, AccelData.z);
 		  // Clear the flag
@@ -149,6 +174,19 @@ int main(void)
 	  {
 		  LogDebugMessage("Accel not available!");
 	  }
+
+	  if (imuUpdateFlag & GYRO_AVAILABLE_FLAG)
+	  {
+		  vector3f GyroData = GetGyroData();
+		  char buffer[4096];
+		  sprintf(buffer, "Gyro available! gx: %f, gy: %f, gz: %f\n", GyroData.x, GyroData.y, GyroData.z);
+		  HAL_UART_Transmit(&huart2, buffer, strlen(buffer), 1000);
+	  }
+	  else
+	  {
+		  LogDebugMessage("Gyro not available!");
+	  }
+
 
 	  HAL_Delay(1000);
     /* USER CODE END WHILE */
@@ -339,13 +377,16 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : ACCEL_INT_Pin */
-  GPIO_InitStruct.Pin = ACCEL_INT_Pin;
+  /*Configure GPIO pins : GYRO_INT_Pin ACCEL_INT_Pin */
+  GPIO_InitStruct.Pin = GYRO_INT_Pin|ACCEL_INT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(ACCEL_INT_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
   HAL_NVIC_SetPriority(EXTI1_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI1_IRQn);
 
@@ -385,10 +426,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	{
 		HandleAccelInterrupt();
 	}
-//	else if (GPIO_Pin == GYRO_INT_Pin)
-//	{
-//
-//	}
+	else if (GPIO_Pin == GYRO_INT_Pin)
+	{
+		HandleGyroInterrupt();
+	}
 }
 
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
