@@ -146,6 +146,26 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  // TODO: Not ideal//replace with more robust alternative
+	  // Pretty much catches case when no update is available for 1x
+	  if (imuUpdateFlag == 0)
+	  {
+		  HAL_Delay(100);
+		  if (imuUpdateFlag == 0)
+		  {
+			  LogDebugMessage("Lockup Detected!");
+			  HAL_I2C_Master_Abort_IT(&hi2c1, GYRO_ADDR);
+			  HAL_I2C_Master_Abort_IT(&hi2c1, ADXL345_ADDR);
+			  // Disable and then re-ennable the i2c peripheral
+
+			  hi2c1.Instance->CR1 |= I2C_CR1_STOP;
+			  hi2c1.Instance->CR1 &= ~I2C_CR1_PE;
+			  HAL_Delay(100);
+			  hi2c1.Instance->CR1 &= ~I2C_CR1_STOP;
+			  hi2c1.Instance->CR1 |= I2C_CR1_PE;
+		  }
+	  }
+
 	  // Turn the second built-in LED on when a successful GNSS fix was found
 	  if (lastNavFix.flags & NAV_PVT_FLAGS_OKFIX)
 	  {
@@ -156,7 +176,7 @@ int main(void)
 	  }
 	  else
 	  {
-		  HAL_UART_Transmit(&huart2, "NO FIX!\n", strlen("NO FIX!\n"), 100);
+		  //HAL_UART_Transmit(&huart2, "NO FIX!\n", strlen("NO FIX!\n"), 100);
 		  HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
 	  }
 
@@ -170,10 +190,10 @@ int main(void)
 		  // Clear the flag
 		  imuUpdateFlag &= ~ACCEL_AVAILABLE_FLAG;
 	  }
-	  else
-	  {
-		  LogDebugMessage("Accel not available!");
-	  }
+//	  else
+//	  {
+//		  LogDebugMessage("Accel not available!");
+//	  }
 
 	  if (imuUpdateFlag & GYRO_AVAILABLE_FLAG)
 	  {
@@ -182,13 +202,15 @@ int main(void)
 		  sprintf(buffer, "Gyro available! gx: %f, gy: %f, gz: %f\n", GyroData.x, GyroData.y, GyroData.z);
 		  HAL_UART_Transmit(&huart2, buffer, strlen(buffer), 1000);
 	  }
-	  else
-	  {
-		  LogDebugMessage("Gyro not available!");
-	  }
+//	  else
+//	  {
+//		  LogDebugMessage("Gyro not available!");
+//	  }
 
 	  RunWatchdogTick();
-	  HAL_Delay(1000);
+
+
+//	  HAL_Delay(1000);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -258,7 +280,7 @@ static void MX_I2C1_Init(void)
   hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
   hi2c1.Init.OwnAddress2 = 0;
   hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_ENABLE;
   if (HAL_I2C_Init(&hi2c1) != HAL_OK)
   {
     Error_Handler();
@@ -318,7 +340,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
+  huart2.Init.BaudRate = 1000000;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -461,6 +483,16 @@ void LogDebugMessage(char *fmt, ...)
 		// OTE: The +1 ensures the \n is transmitted as well
 		HAL_UART_Transmit/*_IT*/(&huart2, buffer, charsWritten+1, 1000);
 	}
+}
+
+void HAL_I2C_ErrorCallback (I2C_HandleTypeDef *hi2c)
+{
+	LogDebugMessage("ErrorCallback!");
+}
+
+void HAL_I2C_AbortCpltCallback (I2C_HandleTypeDef *hi2c)
+{
+	LogDebugMessage("AbortCpltCallback!");
 }
 /* USER CODE END 4 */
 
