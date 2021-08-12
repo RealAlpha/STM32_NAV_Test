@@ -50,14 +50,24 @@ void HandleAccelInterrupt()
 {
 	// TODO: Switch interrupts? Now we're assuming the only interrupt source is that data is available
 	internalStateFlags |= ACCEL_AWAITING_I2C;
-	HAL_I2C_Mem_Read_IT(imuI2CHandle, ADXL345_ADDR, 0x32, 1, accelDataBuffer, 6);
+
+	// Ensure we don't start an I2C request while still waiting for another one to complete!
+	if (!(internalStateFlags & GYRO_AWAITING_I2C))
+	{
+		HAL_StatusTypeDef Status = HAL_I2C_Mem_Read_IT(imuI2CHandle, ADXL345_ADDR, 0x32, 1, accelDataBuffer, 6);
+	}
 }
 
 void HandleGyroInterrupt()
 {
 	// TODO: Switch interrupts? Now we're assuming the only interrupt source is that data is available
 	internalStateFlags |= GYRO_AWAITING_I2C;
-	HAL_I2C_Mem_Read_IT(imuI2CHandle, GYRO_ADDR, 0x1D, 1, gyroDataBuffer, 6);
+
+	// Ensure we don't start an I2C request while still waiting for another one to complete!
+	if (!(internalStateFlags & ACCEL_AWAITING_I2C))
+	{
+		HAL_StatusTypeDef Status = HAL_I2C_Mem_Read_IT(imuI2CHandle, GYRO_ADDR, 0x1D, 1, gyroDataBuffer, 6);
+	}
 }
 
 void HandleI2CInterrupt(I2C_HandleTypeDef *hi2c)
@@ -88,6 +98,17 @@ void HandleI2CInterrupt(I2C_HandleTypeDef *hi2c)
 		// Clear flag
 		internalStateFlags &= ~GYRO_AWAITING_I2C;
 	}
+
+	// Allow pending actions from the gyro/accelerometer to be run (useful when data available overlaps with an existingn transfer)
+	// TODO: Currently calls interrupt function sincne all it really does is start the I2C / settingn the flag twice won't do any harm - but this might channge in the future!
+	if (internalStateFlags & ACCEL_AWAITING_I2C)
+	{
+		HandleAccelInterrupt();
+	}
+	else if (internalStateFlags & GYRO_AWAITING_I2C)
+	{
+		HandleGyroInterrupt();
+	}
 }
 
 vector3f GetAccelData()
@@ -115,4 +136,13 @@ vector3f GetGyroData()
 	imuUpdateFlag &= ~GYRO_AVAILABLE_FLAG;
 
 	return gyroRates;
+}
+
+void RunWatchdogTick()
+{
+	if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1) && !(internalStateFlags & ACCEL_AWAITING_I2C))
+	{
+		// Stale accel connectionn! Perform manual innterrupt handle/simulate an innterrupt to (hopefully) clear it!
+		HandleAccelInterrupt();
+	}
 }

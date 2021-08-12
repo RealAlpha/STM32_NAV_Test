@@ -66,4 +66,7 @@ vector3f GetAccelData();
  */
 vector3f GetGyroData();
 
+// Checks for "stale" ADXL interrupts / line remaining HIGH w/o I2C interraction
+void RunWatchdogTick();
+
 #endif /* IMU_HELPERS_H_ */

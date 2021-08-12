@@ -187,7 +187,7 @@ int main(void)
 		  LogDebugMessage("Gyro not available!");
 	  }
 
-
+	  RunWatchdogTick();
 	  HAL_Delay(1000);
     /* USER CODE END WHILE */
 
