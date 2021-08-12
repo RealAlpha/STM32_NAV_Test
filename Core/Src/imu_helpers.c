@@ -48,25 +48,29 @@ void PerformImuConfiguration(I2C_HandleTypeDef *hi2c, uint16_t AccelRate, uint16
 
 void HandleAccelInterrupt()
 {
-	// TODO: Switch interrupts? Now we're assuming the only interrupt source is that data is available
-	internalStateFlags |= ACCEL_AWAITING_I2C;
-
 	// Ensure we don't start an I2C request while still waiting for another one to complete!
 	if (!(internalStateFlags & GYRO_AWAITING_I2C))
 	{
+		internalStateFlags |= ACCEL_AWAITING_I2C;
 		HAL_StatusTypeDef Status = HAL_I2C_Mem_Read_IT(imuI2CHandle, ADXL345_ADDR, 0x32, 1, accelDataBuffer, 6);
+	}
+	else
+	{
+		internalStateFlags |= ACCEL_NEED_I2C;
 	}
 }
 
 void HandleGyroInterrupt()
 {
-	// TODO: Switch interrupts? Now we're assuming the only interrupt source is that data is available
-	internalStateFlags |= GYRO_AWAITING_I2C;
-
 	// Ensure we don't start an I2C request while still waiting for another one to complete!
 	if (!(internalStateFlags & ACCEL_AWAITING_I2C))
 	{
+		internalStateFlags |= GYRO_AWAITING_I2C;
 		HAL_StatusTypeDef Status = HAL_I2C_Mem_Read_IT(imuI2CHandle, GYRO_ADDR, 0x1D, 1, gyroDataBuffer, 6);
+	}
+	else
+	{
+		internalStateFlags |= GYRO_NEED_I2C;
 	}
 }
 
@@ -101,12 +105,14 @@ void HandleI2CInterrupt(I2C_HandleTypeDef *hi2c)
 
 	// Allow pending actions from the gyro/accelerometer to be run (useful when data available overlaps with an existingn transfer)
 	// TODO: Currently calls interrupt function sincne all it really does is start the I2C / settingn the flag twice won't do any harm - but this might channge in the future!
-	if (internalStateFlags & ACCEL_AWAITING_I2C)
+	if (internalStateFlags & ACCEL_NEED_I2C)
 	{
+		internalStateFlags &= ~ACCEL_NEED_I2C;
 		HandleAccelInterrupt();
 	}
-	else if (internalStateFlags & GYRO_AWAITING_I2C)
+	else if (internalStateFlags & GYRO_NEED_I2C)
 	{
+		internalStateFlags &= ~GYRO_NEED_I2C;
 		HandleGyroInterrupt();
 	}
 }

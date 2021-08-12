@@ -25,6 +25,9 @@
 // TODO: Currently does not implement a mechanism for when an interrupt is triggered while we're still waiting for data - this needs to be fixed, possibly by using a latent check and/or a second state variable that figures out which i2c read call was the first one
 #define ACCEL_AWAITING_I2C 0b1
 #define GYRO_AWAITING_I2C 0b1 << 1
+// NOTE: Below 2 are used for overlapping interrupts / starting an accel or gyro read after we're done with the one that is ongoing at the time of the interrupt
+#define ACCEL_NEED_I2C 0b1 << 2
+#define GYRO_NEED_I2C 0b1 << 3
 
 // Globals for storing the latest measurements + flags
 // TODO: Remove/superceded by function - or should we set these if we need the data multiple times between updates?
