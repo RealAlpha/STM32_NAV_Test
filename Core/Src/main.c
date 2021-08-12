@@ -172,7 +172,7 @@ int main(void)
 	  if (lastNavFix.flags & NAV_PVT_FLAGS_OKFIX)
 	  {
 		  char buffer[256];
-		  snprintf(buffer, 256, "lat:%f,lon:%f,hacc:%f,fix:%i,iTOW:%i\n", (float)lastNavFix.lat*powf(10, -7), lastNavFix.lon*powf(10, -7), lastNavFix.hAcc*powf(10, -3), lastNavFix.fixType, lastNavFix.iTOW);
+		  snprintf(buffer, 256, "dev=GPS,lat:%f,lon:%f,hacc:%f,fix:%i,iTOW:%i\n", (float)lastNavFix.lat*powf(10, -7), lastNavFix.lon*powf(10, -7), lastNavFix.hAcc*powf(10, -3), lastNavFix.fixType, lastNavFix.iTOW);
 		  HAL_UART_Transmit(&huart2, buffer, strlen(buffer), 100);
 		  HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
 	  }
@@ -186,7 +186,7 @@ int main(void)
 	  {
 		  vector3f AccelData = GetAccelData();
 		  char buffer[4096];
-		  sprintf(buffer, "Accel available! x: %f, y: %f, z: %f\n", AccelData.x, AccelData.y, AccelData.z);
+		  sprintf(buffer, "dev=ACCEL,x:%f,y:%f,z:%f\n", AccelData.x, AccelData.y, AccelData.z);
 		  HAL_UART_Transmit(&huart2, buffer, strlen(buffer), 1000);
 		  ////LogDebugMessage("Accel available! gx: %f, gy: %f, gz: %f", AccelData.x, AccelData.y, AccelData.z);
 		  // Clear the flag
@@ -201,7 +201,7 @@ int main(void)
 	  {
 		  vector3f GyroData = GetGyroData();
 		  char buffer[4096];
-		  sprintf(buffer, "Gyro available! gx: %f, gy: %f, gz: %f\n", GyroData.x, GyroData.y, GyroData.z);
+		  sprintf(buffer, "dev=GYRO,gx:%f,gy:%f,gz:%f\n", GyroData.x, GyroData.y, GyroData.z);
 		  HAL_UART_Transmit(&huart2, buffer, strlen(buffer), 1000);
 	  }
 //	  else
