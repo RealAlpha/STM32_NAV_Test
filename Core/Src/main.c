@@ -156,6 +156,8 @@ int main(void)
 			  LogDebugMessage("Lockup Detected!");
 			  HAL_I2C_Master_Abort_IT(&hi2c1, GYRO_ADDR);
 			  HAL_I2C_Master_Abort_IT(&hi2c1, ADXL345_ADDR);
+			  HAL_I2C_StateTypeDef I2CState = HAL_I2C_GetState(&hi2c1);
+			  LogDebugMessage("I2C State: %d", (int)I2CState);
 			  // Disable and then re-ennable the i2c peripheral
 
 			  hi2c1.Instance->CR1 |= I2C_CR1_STOP;
@@ -488,6 +490,11 @@ void LogDebugMessage(char *fmt, ...)
 void HAL_I2C_ErrorCallback (I2C_HandleTypeDef *hi2c)
 {
 	LogDebugMessage("ErrorCallback!");
+	hi2c1.Instance->CR1 |= I2C_CR1_STOP;
+	hi2c1.Instance->CR1 &= ~I2C_CR1_PE;
+	//HAL_Delay(100);
+	hi2c1.Instance->CR1 &= ~I2C_CR1_STOP;
+	hi2c1.Instance->CR1 |= I2C_CR1_PE;
 }
 
 void HAL_I2C_AbortCpltCallback (I2C_HandleTypeDef *hi2c)
