@@ -302,6 +302,7 @@ void ProcessGPSBuffer(uint16_t EndPos)
 					// Copy over the payload directly into the struct - this is possible because the struct is a 1:1 match with the payload.
 					// NOTE: Might want to only include the "relevant" attributes or potentially even do further processing, but that might not be best suited for an interrupt./
 					memcpy(&lastNavFix, &GPSBuffer[parsePos], PayloadLength);
+					GPSUpdateFlags |= GPS_UPDATE_AVAILABLE;
 					break;
 				}
 				break;

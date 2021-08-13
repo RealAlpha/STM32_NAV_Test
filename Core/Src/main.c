@@ -173,7 +173,7 @@ int main(void)
 	  // Turn the second built-in LED on when a successful (new)GNSS fix was found
 	  // NOTE: Assuming iTOW is unique among all (valid) new fixes!
 	  // TODO: Switch to some form of update flag like IMU code?
-	  if (lastNavFix.flags & NAV_PVT_FLAGS_OKFIX && lastNavFix.fixType == 3)
+	  if (lastNavFix.flags & NAV_PVT_FLAGS_OKFIX && lastNavFix.fixType == 3 && GPSUpdateFlags & GPS_UPDATE_AVAILABLE)
 	  {
 		  // NOTE: iTOW check is in this nested if to allow that status LED to still funnction properly (rather than blinnking when a GPS message is fixed)
 		  if (lastNavFix.iTOW != last_iTOW)
@@ -183,6 +183,7 @@ int main(void)
 			  HAL_UART_Transmit(&huart2, buffer, strlen(buffer), 100);
 			  last_iTOW = lastNavFix.iTOW;
 		  }
+		  GPSUpdateFlags &= ~GPS_UPDATE_AVAILABLE;
 		  HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
 	  }
 	  else

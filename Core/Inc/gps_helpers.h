@@ -12,6 +12,8 @@
 //#include <cstddef>
 #include "stm32f4xx_hal.h"
 
+#define GPS_UPDATE_AVAILABLE 0b1
+
 #define SYNC_A 0xB5
 #define SYNC_B 0x62
 
@@ -227,5 +229,7 @@ unsigned int currentGPSBufferPosition;
  * Global state variables. Again, not ideal but probably the best way to implement "background"/interrupt-based processing without using C++/OOP.
  */
 NAV_PVT lastNavFix;
+
+uint8_t GPSUpdateFlags;
 
 #endif /* INC_GPS_HELPERS_H_ */
