@@ -140,6 +140,8 @@ int main(void)
 
 
   PerformImuConfiguration(&hi2c1, 3200, 3200);
+
+  unsigned long int last_iTOW = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -168,12 +170,19 @@ int main(void)
 		  }
 	  }
 
-	  // Turn the second built-in LED on when a successful GNSS fix was found
-	  if (lastNavFix.flags & NAV_PVT_FLAGS_OKFIX)
+	  // Turn the second built-in LED on when a successful (new)GNSS fix was found
+	  // NOTE: Assuming iTOW is unique among all (valid) new fixes!
+	  // TODO: Switch to some form of update flag like IMU code?
+	  if (lastNavFix.flags & NAV_PVT_FLAGS_OKFIX && lastNavFix.fixType == 3)
 	  {
-		  char buffer[256];
-		  snprintf(buffer, 256, "dev=GPS,lat:%f,lon:%f,hacc:%f,fix:%i,iTOW:%i\n", (float)lastNavFix.lat*powf(10, -7), lastNavFix.lon*powf(10, -7), lastNavFix.hAcc*powf(10, -3), lastNavFix.fixType, lastNavFix.iTOW);
-		  HAL_UART_Transmit(&huart2, buffer, strlen(buffer), 100);
+		  // NOTE: iTOW check is in this nested if to allow that status LED to still funnction properly (rather than blinnking when a GPS message is fixed)
+		  if (lastNavFix.iTOW != last_iTOW)
+		  {
+			  char buffer[256];
+			  snprintf(buffer, 256, "dev=GPS,lat:%f,lon:%f,hacc:%f,fix:%i,iTOW:%i\n", (float)lastNavFix.lat*powf(10, -7), lastNavFix.lon*powf(10, -7), lastNavFix.hAcc*powf(10, -3), lastNavFix.fixType, lastNavFix.iTOW);
+			  HAL_UART_Transmit(&huart2, buffer, strlen(buffer), 100);
+			  last_iTOW = lastNavFix.iTOW;
+		  }
 		  HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
 	  }
 	  else
