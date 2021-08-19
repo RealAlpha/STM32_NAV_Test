@@ -22,8 +22,8 @@ void PerformImuConfiguration(I2C_HandleTypeDef *hi2c, uint16_t AccelRate, uint16
 
 	HAL_I2C_Mem_Write(imuI2CHandle, ADXL345_ADDR, 0x2D, 1, &POWER_CTL_STOP, 1, 1000);
 	HAL_I2C_Mem_Write(imuI2CHandle, ADXL345_ADDR, 0x31, 1, &DATA_FORMAT, 1, 1000);
-	//HAL_I2C_Mem_Write(imuI2CHandle, ADXL345_ADDR, 0x2C, 1, &BW_RATE, 1, 1000);
 	HAL_I2C_Mem_Write(imuI2CHandle, ADXL345_ADDR, 0x2E, 1, &INT_ENABLE, 1, 1000);
+	HAL_I2C_Mem_Write(imuI2CHandle, ADXL345_ADDR, 0x2C, 1, &BW_RATE, 1, 1000);
 	HAL_I2C_Mem_Write(imuI2CHandle, ADXL345_ADDR, 0x2D, 1, &POWER_CTL_START, 1, 1000);
 
 
@@ -121,9 +121,10 @@ vector3f GetAccelData()
 {
 	// TODO: Make this a local variable instead?
 	// Convert the gyro measurements into g's assuming full scale measurement range // 4mg/LSB
-	accelMeas.x = (float)accelMeasRaw.x * 4E-3;
-	accelMeas.y = (float)accelMeasRaw.y * 4E-3;
-	accelMeas.z = (float)accelMeasRaw.z * 4E-3;
+	// TOOD: Investigate/fix slow operation caused by these bias operations (possibly still not float literals, despite the f...but even that wouldn't explain it?)
+	accelMeas.x = (float)accelMeasRaw.x * 4E-3;// - ACCEL_BIAS_X;
+	accelMeas.y = (float)accelMeasRaw.y * 4E-3;// - ACCEL_BIAS_Y;
+	accelMeas.z = (float)accelMeasRaw.z * 4E-3;// - ACCEL_BIAS_Z;
 
 	// Clear the accelerometer update available flag if it was set
 	imuUpdateFlag &= ~ACCEL_AVAILABLE_FLAG;

@@ -29,6 +29,12 @@
 #define ACCEL_NEED_I2C 0b1 << 2
 #define GYRO_NEED_I2C 0b1 << 3
 
+// Measured biasses (deviation from 1g when held steady in g's - should be SUBTRACTED from measurements)
+// TODO: These are measured - should they be params insntead?
+#define ACCEL_BIAS_X -0.01229200000000008f
+#define ACCEL_BIAS_Y 0.027628000000000208f
+#define ACCEL_BIAS_Z 0.1611999999999998f
+
 // Globals for storing the latest measurements + flags
 // TODO: Remove/superceded by function - or should we set these if we need the data multiple times between updates?
 vector3f accelMeas;

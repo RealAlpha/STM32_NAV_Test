@@ -26,6 +26,7 @@
 #include "imu_helpers.h"
 #include <math.h>
 #include <stdarg.h>
+#include <stdbool.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -35,6 +36,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define SERIAL_BUFFER_SIZE 4096
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -49,8 +51,13 @@ UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_usart1_rx;
 DMA_HandleTypeDef hdma_usart1_tx;
+DMA_HandleTypeDef hdma_usart2_tx;
+DMA_HandleTypeDef hdma_usart2_rx;
 
 /* USER CODE BEGIN PV */
+
+// Avoid processing interrupts while we're still initing
+bool initCompleted = false;
 
 /* USER CODE END PV */
 
@@ -103,15 +110,17 @@ int main(void)
   MX_USART2_UART_Init();
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
-  ///HAL_UART_DMAPause(&huart1);
-  HAL_Delay(1000);
-  PerformProtoNegotiation(&huart1, 9600, 115200);
-  HAL_Delay(1000);
+  initCompleted = true;
+  ///HAL_UART_DMAPause(&huart2);
+  // TODO: Re-enable GPS
+  //HAL_Delay(1000);
+  //PerformProtoNegotiation(&huart2, 9600, 115200);
+  //HAL_Delay(1000);
 
-  ///HAL_UART_DMAResume(&huart1);
-  //UpdateBaudRate(&huart1, 9600);
+  ///HAL_UART_DMAResume(&huart2);
+  //UpdateBaudRate(&huart2, 9600);
   HAL_Delay(1000);
-  HAL_StatusTypeDef StartListenResult = HAL_UARTEx_ReceiveToIdle_DMA(&huart1, GPSBuffer, GPS_BUFFER_SIZE);
+  HAL_StatusTypeDef StartListenResult = HAL_UARTEx_ReceiveToIdle_DMA(&huart2, GPSBuffer, GPS_BUFFER_SIZE);
   //HAL_UARTEx_ReceiveToIdle_IT(&huart1, Buffer, GPS_BUFFER_SIZE);//HAL_UARTEx_ReceiveToIdle_DMA(&huart1, GPSBuffer, GPS_BUFFER_SIZE);
 
 /*
@@ -142,12 +151,16 @@ int main(void)
   PerformImuConfiguration(&hi2c1, 3200, 3200);
 
   unsigned long int last_iTOW = 0;
+
+  char buffer[SERIAL_BUFFER_SIZE];
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  int curBufferPos = 0;
+	  /*
 	  // TODO: Not ideal//replace with more robust alternative
 	  // Pretty much catches case when no update is available for 1x
 	  if (imuUpdateFlag == 0)
@@ -168,11 +181,12 @@ int main(void)
 			  hi2c1.Instance->CR1 &= ~I2C_CR1_STOP;
 			  hi2c1.Instance->CR1 |= I2C_CR1_PE;
 		  }
-	  }
+	  }*/
 
 	  // Turn the second built-in LED on when a successful (new)GNSS fix was found
 	  // NOTE: Assuming iTOW is unique among all (valid) new fixes!
 	  // TODO: Switch to some form of update flag like IMU code?
+	  /*
 	  if (lastNavFix.flags & NAV_PVT_FLAGS_OKFIX && lastNavFix.fixType == 3 && GPSUpdateFlags & GPS_UPDATE_AVAILABLE)
 	  {
 		  // NOTE: iTOW check is in this nested if to allow that status LED to still funnction properly (rather than blinnking when a GPS message is fixed)
@@ -191,38 +205,55 @@ int main(void)
 		  //HAL_UART_Transmit(&huart2, "NO FIX!\n", strlen("NO FIX!\n"), 100);
 		  HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
 	  }
+	  */
 
 	  if (imuUpdateFlag & ACCEL_AVAILABLE_FLAG)
 	  {
+
 		  vector3f AccelData = GetAccelData();
-		  char buffer[4096];
-		  sprintf(buffer, "dev:ACCEL,x:%f,y:%f,z:%f\n", AccelData.x, AccelData.y, AccelData.z);
-		  HAL_UART_Transmit(&huart2, buffer, strlen(buffer), 1000);
+		  //vector3f AccelData = {0.f, 0.f, 0.f};
+		  //HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+		  //HAL_GPIO_WritePin(LED2_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
+		  curBufferPos += snprintf(&buffer[curBufferPos], SERIAL_BUFFER_SIZE-curBufferPos, "dev:ACCEL,x:%f,y:%f,z:%f\n", AccelData.x, AccelData.y, AccelData.z);
+		  //HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+		  //HAL_GPIO_WritePin(LED2_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
+		  //HAL_UART_Transmit(&huart2, buffer, strlen(buffer), 100);
+
 		  ////LogDebugMessage("Accel available! gx: %f, gy: %f, gz: %f", AccelData.x, AccelData.y, AccelData.z);
-		  // Clear the flag
+
+		 // vector3f AccelData = GetAccelData();
+		  //HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+		  //HAL_Delay(1);
+		  //HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+		  // Clear the flag		   */
 		  imuUpdateFlag &= ~ACCEL_AVAILABLE_FLAG;
 	  }
 //	  else
 //	  {
 //		  LogDebugMessage("Accel not available!");
 //	  }
-
 	  if (imuUpdateFlag & GYRO_AVAILABLE_FLAG)
 	  {
 		  vector3f GyroData = GetGyroData();
-		  char buffer[4096];
-		  sprintf(buffer, "dev:GYRO,gx:%f,gy:%f,gz:%f\n", GyroData.x, GyroData.y, GyroData.z);
-		  HAL_UART_Transmit(&huart2, buffer, strlen(buffer), 1000);
+
+		  curBufferPos += snprintf(&buffer[curBufferPos], SERIAL_BUFFER_SIZE-curBufferPos, "dev:GYRO,gx:%f,gy:%f,gz:%f\n", GyroData.x, GyroData.y, GyroData.z);
 	  }
 //	  else
 //	  {
 //		  LogDebugMessage("Gyro not available!");
 //	  }
-
+	  //char test = "r\n";
+	  if (HAL_UART_GetState(&huart1) != HAL_BUSY && curBufferPos != 0)
+	  {
+		HAL_UART_Transmit(&huart1, buffer, curBufferPos, 100);
+	  }
+	  //HAL_UART_Transmit(&huart2, test, strlen(test), 1000);
 	  RunWatchdogTick();
 
 
 //	  HAL_Delay(1000);
+
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -249,7 +280,12 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLM = 8;
+  RCC_OscInitStruct.PLL.PLLN = 168;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -258,12 +294,12 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
   {
     Error_Handler();
   }
@@ -319,7 +355,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 1.045*115200;
+  huart1.Init.BaudRate = 1.0447968*4000000;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
@@ -352,7 +388,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 1000000;
+  huart2.Init.BaudRate = 1.0447968*115200;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -377,8 +413,15 @@ static void MX_DMA_Init(void)
 
   /* DMA controller clock enable */
   __HAL_RCC_DMA2_CLK_ENABLE();
+  __HAL_RCC_DMA1_CLK_ENABLE();
 
   /* DMA interrupt init */
+  /* DMA1_Stream5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
+  /* DMA1_Stream6_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
   /* DMA2_Stream2_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream2_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
@@ -455,6 +498,12 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
+	// Ensure initialization was completed before we handle interrupts - it will trigger a hardFault otherwise
+	if (!initCompleted)
+	{
+		return;
+	}
+
 	// TODO: Check IQn and/or port - pretty much, make sure this is indeed the iterrupt we want
 	if (GPIO_Pin == ACCEL_INT_Pin)
 	{
@@ -500,6 +549,8 @@ void LogDebugMessage(char *fmt, ...)
 void HAL_I2C_ErrorCallback (I2C_HandleTypeDef *hi2c)
 {
 	LogDebugMessage("ErrorCallback!");
+	internalStateFlags = 0; // Reset IMU state so this failed transfer does not lead to blocking all future attempst at communication because we suspect the I2C bus is still busy
+	return;
 	hi2c1.Instance->CR1 |= I2C_CR1_STOP;
 	hi2c1.Instance->CR1 &= ~I2C_CR1_PE;
 	//HAL_Delay(100);
