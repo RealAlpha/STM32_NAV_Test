@@ -27,6 +27,7 @@
 #include <math.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #define CRC_CCITT
 #include "../ThirdParty/CRC/crc.h"
 /* USER CODE END Includes */
@@ -602,10 +603,12 @@ void SendPacket(uint8_t pktId, void *data, uint16_t dataSize)
 	if (!crcInitialized)
 	{
 		crcInit();
+		crcInitialized = true;
 	}
 
 	// Compute/set the checksum
-	uint16_t checksum = crcFast(&packet[SYNC_PATTERN_SIZE], SYNC_PATTERN_SIZE+sizeof(pktId)+sizeof(dataSize)+dataSize);
+	// NOTE: This appears to be CCITT-FALSE!
+	uint16_t checksum = crcFast(&packet[SYNC_PATTERN_SIZE], sizeof(pktId)+sizeof(dataSize)+dataSize);
 	*((uint16_t*)&packet[packetSize-sizeof(uint16_t)]) = checksum;
 
 	// Transmit the packet (in a blocking way)
