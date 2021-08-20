@@ -5,6 +5,7 @@
  *      Author: alpha-v
  */
 #include "imu_helpers.h"
+#include <stdbool.h>
 
 // Start PD
 /*
@@ -72,6 +73,11 @@
 
 // End PD
 
+// Begin PV
+// Only works for first initialization/assumes only one takes place, but ensures interrupts don't trigger any reads while we're still in the process of setting everything up
+bool bInitializationComplete = false;
+// End PV
+
 
 void PerformImuConfiguration(I2C_HandleTypeDef *hi2c, uint16_t AccelRate, uint16_t GyroRate)
 {
@@ -120,7 +126,7 @@ void PerformImuConfiguration(I2C_HandleTypeDef *hi2c, uint16_t AccelRate, uint16
 	Status = HAL_I2C_Mem_Write(imuI2CHandle, QMC_ADDR, QMC_ADD_CR1, 1, &QMC_CR1, 1, 1000);
 	Status = HAL_I2C_Mem_Write(imuI2CHandle, QMC_ADDR, QMC_ADD_CR2, 1, &QMC_CR2, 1, 1000);
 
-
+	bInitializationComplete = true;
 
 	// Force-handle interrupt to avoid staying HIGH; TODO: only trigger when it was low?
 	HandleAccelInterrupt();
@@ -132,11 +138,13 @@ void PerformImuConfiguration(I2C_HandleTypeDef *hi2c, uint16_t AccelRate, uint16
 void HandleAccelInterrupt()
 {
 	// Ensure we don't start an I2C request while still waiting for another one to complete!
-	if (!(internalStateFlags & STATE_AWAITING_MASK))
+	if (!(internalStateFlags & STATE_AWAITING_MASK) && bInitializationComplete)
 	{
 		HAL_StatusTypeDef Status = HAL_I2C_Mem_Read_IT(imuI2CHandle, ADXL345_ADDR, 0x32, 1, accelDataBuffer, 6);
 		if (Status == HAL_OK)
 		{
+			// Ensure we clear any need flags (as we're currently executing / don't want duplicate calls if two interrupts are spawned close together)
+			internalStateFlags &= ~ACCEL_NEED_I2C;
 			internalStateFlags |= ACCEL_AWAITING_I2C;
 		}
 	}
@@ -149,11 +157,13 @@ void HandleAccelInterrupt()
 void HandleGyroInterrupt()
 {
 	// Ensure we don't start an I2C request while still waiting for another one to complete!
-	if (!(internalStateFlags & STATE_AWAITING_MASK))
+	if (!(internalStateFlags & STATE_AWAITING_MASK) && bInitializationComplete)
 	{
 		HAL_StatusTypeDef Status = HAL_I2C_Mem_Read_IT(imuI2CHandle, GYRO_ADDR, 0x1D, 1, gyroDataBuffer, 6);
 		if (Status == HAL_OK)
 		{
+			// Ensure we clear any need flags (as we're currently executing / don't want duplicate calls if two interrupts are spawned close together)
+			internalStateFlags &= ~GYRO_NEED_I2C;
 			internalStateFlags |= GYRO_AWAITING_I2C;
 		}
 	}
@@ -166,7 +176,7 @@ void HandleGyroInterrupt()
 void HandleQMCInterrupt()
 {
 	// Ensure we don't start an I2C request while still waiting for another one to complete!
-	if (!(internalStateFlags & STATE_AWAITING_MASK))
+	if (!(internalStateFlags & STATE_AWAITING_MASK) && bInitializationComplete)
 	{
 		// See the initialization - poinnter rollover won't clear the interrupt. To work around this,
 		// we simply won't check the DRDY flag, but only the overflow one (which won't be cleared by a read)
@@ -176,6 +186,8 @@ void HandleQMCInterrupt()
 		HAL_StatusTypeDef Status = HAL_I2C_Mem_Read_IT(imuI2CHandle, QMC_ADDR, 0x00, 1, qmcDataBuffer, 7);
 		if (Status == HAL_OK)
 		{
+			// Ensure we clear any need flags (as we're currently executing / don't want duplicate calls if two interrupts are spawned close together)
+			internalStateFlags &= ~QMC_NEED_I2C;
 			internalStateFlags |= QMC_AWAITING_I2C;
 		}
 	}
