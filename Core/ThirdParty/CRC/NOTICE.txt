@@ -1,0 +1,2 @@
+Obtained from: https://barrgroup.com/downloads/code-crc-c
+Chosen for: Simple CRC16 implementation with pretty public license. Would use CRC peripheral, but don't want to deal with padding for now / this allows us to just not think about that (and use byte arrays)

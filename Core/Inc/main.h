@@ -37,7 +37,6 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -72,7 +71,9 @@ void Error_Handler(void);
 #define ACCEL_INT_GPIO_Port GPIOB
 #define ACCEL_INT_EXTI_IRQn EXTI1_IRQn
 /* USER CODE BEGIN Private defines */
-
+#define ACCEL_PACKET_ID 0
+#define GYRO_PACKET_ID 1
+#define MAG_PACKET_ID 2
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

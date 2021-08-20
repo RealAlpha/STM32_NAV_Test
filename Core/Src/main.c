@@ -27,6 +27,8 @@
 #include <math.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#define CRC_CCITT
+#include "../ThirdParty/CRC/crc.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -213,58 +215,24 @@ int main(void)
 	  {
 
 		  vector3f AccelData = GetAccelData();
-		  //vector3f AccelData = {0.f, 0.f, 0.f};
-		  //HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
-		  //HAL_GPIO_WritePin(LED2_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
-		  curBufferPos += snprintf(&buffer[curBufferPos], SERIAL_BUFFER_SIZE-curBufferPos, "dev:ACCEL,x:%f,y:%f,z:%f\n", AccelData.x, AccelData.y, AccelData.z);
-		  //HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
-		  //HAL_GPIO_WritePin(LED2_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
-		  //HAL_UART_Transmit(&huart2, buffer, strlen(buffer), 100);
-
-		  ////LogDebugMessage("Accel available! gx: %f, gy: %f, gz: %f", AccelData.x, AccelData.y, AccelData.z);
-
-		 // vector3f AccelData = GetAccelData();
-		  //HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
-		  //HAL_Delay(1);
-		  //HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
-		  // Clear the flag		   */
-		  imuUpdateFlag &= ~ACCEL_AVAILABLE_FLAG;
+		  // NOTE: Blocking fn / won't unset data -> can use local var as ptr
+		  SendPacket(ACCEL_PACKET_ID, (void*)&AccelData, sizeof(AccelData));
 	  }
-//	  else
-//	  {
-//		  LogDebugMessage("Accel not available!");
-//	  }
+
 	  if (imuUpdateFlag & GYRO_AVAILABLE_FLAG)
 	  {
 		  vector3f GyroData = GetGyroData();
-
-		  curBufferPos += snprintf(&buffer[curBufferPos], SERIAL_BUFFER_SIZE-curBufferPos, "dev:GYRO,gx:%f,gy:%f,gz:%f\n", GyroData.x, GyroData.y, GyroData.z);
+		  SendPacket(GYRO_PACKET_ID, (void*)&GyroData, sizeof(GyroData));
 	  }
-//	  else
-//	  {
-//		  LogDebugMessage("Gyro not available!");
-//	  }
 
 	  if (imuUpdateFlag & QMC_AVAILABLE_FLAG)
 	  {
 		  vector3f MagData = GetMagData();
 		  // Obtain the norm/magnitude of the magnetic field vector
-		  float MagNorm = sqrtf(powf(MagData.x, 2) + powf(MagData.y, 2) + powf(MagData.z, 2));
+		  ///float MagNorm = sqrtf(powf(MagData.x, 2) + powf(MagData.y, 2) + powf(MagData.z, 2));
 
-		  // NOTE: Assumes 3000LSB/G
-		  curBufferPos += snprintf(&buffer[curBufferPos], SERIAL_BUFFER_SIZE-curBufferPos, "dev:MAG,x:%f,y:%f,z:%f,norm:%f,norm_conv:%f\n", MagData.x, MagData.y, MagData.z, MagNorm);
+		  SendPacket(MAG_PACKET_ID, (void*)&MagData, sizeof(MagData));
 	  }
-
-	  //char test = "r\n";
-	  if (HAL_UART_GetState(&huart1) != HAL_BUSY && curBufferPos != 0)
-	  {
-		HAL_UART_Transmit(&huart1, buffer, curBufferPos, 100);
-	  }
-	  //HAL_UART_Transmit(&huart2, test, strlen(test), 1000);
-	  RunWatchdogTick();
-
-
-//	  HAL_Delay(1000);
 
 
     /* USER CODE END WHILE */
@@ -594,6 +562,59 @@ void HAL_I2C_AbortCpltCallback (I2C_HandleTypeDef *hi2c)
 {
 	LogDebugMessage("AbortCpltCallback!");
 }
+
+
+// Basic custom serial data protocol; there might be better/more "formal" ways to do this, but this is just a quick demo // our final protocol will be more advanced + will likely rely on dedicated hardware/multiple transport layers
+// NOTE: This is just a made up sync pattern - no data analysis or research was performed, so it might be really bad.
+#define SYNC_PATTERN_A 0xFF
+#define SYNC_PATTERN_B 0x8C
+#define SYNC_PATTERN_SIZE 2 // Helper function to aovid hard-coding the two in
+
+// Basic !BLOCKING! transmit function
+void SendPacket(uint8_t pktId, void *data, uint16_t dataSize)
+{
+	// Create a temporary buffer to store the message in
+	size_t packetSize = /*sync*/2 + /*packet ID*/sizeof(pktId) + /*length*/sizeof(dataSize) + /* data*/dataSize + /*checksum*/sizeof(uint16_t);
+	uint8_t *packet = malloc(packetSize);
+
+	// Pack the header
+	packet[0] = SYNC_PATTERN_A;
+	packet[1] = SYNC_PATTERN_B;
+
+	// Packet ID
+	packet[SYNC_PATTERN_SIZE] = pktId;
+	// NOTE: Below is essentially a reinterpret cast / because we know it's large enough (due to the sizeof), we
+	// can set it in this way. This avoids messing with bitmasks + ensures it's encoded in the same way as
+	// the void* argument (which is probably a casted struct). A more robust protocol would probably make this
+	// more deterministic/better, but for now this works...OK?
+	*((uint16_t*)&packet[SYNC_PATTERN_SIZE+sizeof(pktId)]) = dataSize;
+
+	// Copy over the actual data
+	memcpy(&packet[SYNC_PATTERN_SIZE+sizeof(pktId)+sizeof(dataSize)], data, dataSize);
+
+	// Compute the checksum over all of the packet less the space that is "reserved" for the checksum and the sync pattern
+	// NOTE: Would have used the CRC peripheral, but unfortuantely that requires the data to have a size that is
+	// a multiple of the size of a word -> that would need padding. This was deemed not worth it (for now), so
+	// we're using an online 16-bit CRC implementation (which is probably more appropriate anyway considering the
+	// reasonably small packet sizes).
+	// NOTE: This static way isn't perfect, but since this is the only code that uses CRC / this is a temporary protocol anyway, it should work; KISS
+	static bool crcInitialized = false;
+	if (!crcInitialized)
+	{
+		crcInit();
+	}
+
+	// Compute/set the checksum
+	uint16_t checksum = crcFast(&packet[SYNC_PATTERN_SIZE], SYNC_PATTERN_SIZE+sizeof(pktId)+sizeof(dataSize)+dataSize);
+	*((uint16_t*)&packet[packetSize-sizeof(uint16_t)]) = checksum;
+
+	// Transmit the packet (in a blocking way)
+	HAL_UART_Transmit(&huart1, packet, packetSize, 100);
+
+	// Free the packet buffer to avoid leaking
+	free(packet);
+}
+
 /* USER CODE END 4 */
 
 /**
