@@ -242,6 +242,17 @@ int main(void)
 //	  {
 //		  LogDebugMessage("Gyro not available!");
 //	  }
+
+	  if (imuUpdateFlag & QMC_AVAILABLE_FLAG)
+	  {
+		  vector3f MagData = GetMagData();
+		  // Obtain the norm/magnitude of the magnetic field vector
+		  float MagNorm = sqrtf(powf(MagData.x, 2) + powf(MagData.y, 2) + powf(MagData.z, 2));
+
+		  // NOTE: Assumes 3000LSB/G
+		  curBufferPos += snprintf(&buffer[curBufferPos], SERIAL_BUFFER_SIZE-curBufferPos, "dev:MAG,x:%f,y:%f,z:%f,norm:%f,norm_conv:%f\n", MagData.x, MagData.y, MagData.z, MagNorm);
+	  }
+
 	  //char test = "r\n";
 	  if (HAL_UART_GetState(&huart1) != HAL_BUSY && curBufferPos != 0)
 	  {
