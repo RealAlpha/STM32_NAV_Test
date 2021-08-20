@@ -339,7 +339,7 @@ static void MX_I2C1_Init(void)
   hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
   hi2c1.Init.OwnAddress2 = 0;
   hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_ENABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
   if (HAL_I2C_Init(&hi2c1) != HAL_OK)
   {
     Error_Handler();
@@ -567,20 +567,19 @@ void LogDebugMessage(char *fmt, ...)
 		// NOTE: We don't really care about the \0, but we do want to make sure the serial newlines after each message
 		buffer[charsWritten] = '\n';
 		// OTE: The +1 ensures the \n is transmitted as well
-		HAL_UART_Transmit/*_IT*/(&huart2, buffer, charsWritten+1, 1000);
+		HAL_UART_Transmit/*_IT*/(&huart1, buffer, charsWritten+1, 1000);
 	}
 }
 
 void HAL_I2C_ErrorCallback (I2C_HandleTypeDef *hi2c)
 {
 	LogDebugMessage("ErrorCallback!");
-	internalStateFlags = 0; // Reset IMU state so this failed transfer does not lead to blocking all future attempst at communication because we suspect the I2C bus is still busy
+	// Reset IMU awaiting flags so this failed transfer does not lead to blocking all future attempts at communication because we suspect the I2C bus is still busy
+	// NOTE: Not automagically continuing to the next transfer as the I2C bus might need some time to recover from the error (? no basis, but just a guess) + we don't
+	// want this interrupt to take too long; we might want to change this in the future to help improve bus utilization after an error. (right now the watchdog triggers pretty often / main doesn't take long to process)
+	internalStateFlags &= ~STATE_AWAITING_MASK;
+
 	return;
-	hi2c1.Instance->CR1 |= I2C_CR1_STOP;
-	hi2c1.Instance->CR1 &= ~I2C_CR1_PE;
-	//HAL_Delay(100);
-	hi2c1.Instance->CR1 &= ~I2C_CR1_STOP;
-	hi2c1.Instance->CR1 |= I2C_CR1_PE;
 }
 
 void HAL_I2C_AbortCpltCallback (I2C_HandleTypeDef *hi2c)
