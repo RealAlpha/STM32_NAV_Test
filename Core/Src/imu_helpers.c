@@ -140,7 +140,7 @@ void HandleAccelInterrupt()
 	// Ensure we don't start an I2C request while still waiting for another one to complete!
 	if (!(internalStateFlags & STATE_AWAITING_MASK) && bInitializationComplete)
 	{
-		HAL_StatusTypeDef Status = HAL_I2C_Mem_Read_IT(imuI2CHandle, ADXL345_ADDR, 0x32, 1, accelDataBuffer, 6);
+		HAL_StatusTypeDef Status = HAL_I2C_Mem_Read_DMA(imuI2CHandle, ADXL345_ADDR, 0x32, 1, accelDataBuffer, 6);
 		if (Status == HAL_OK)
 		{
 			// Ensure we clear any need flags (as we're currently executing / don't want duplicate calls if two interrupts are spawned close together)
@@ -159,7 +159,7 @@ void HandleGyroInterrupt()
 	// Ensure we don't start an I2C request while still waiting for another one to complete!
 	if (!(internalStateFlags & STATE_AWAITING_MASK) && bInitializationComplete)
 	{
-		HAL_StatusTypeDef Status = HAL_I2C_Mem_Read_IT(imuI2CHandle, GYRO_ADDR, 0x1D, 1, gyroDataBuffer, 6);
+		HAL_StatusTypeDef Status = HAL_I2C_Mem_Read_DMA(imuI2CHandle, GYRO_ADDR, 0x1D, 1, gyroDataBuffer, 6);
 		if (Status == HAL_OK)
 		{
 			// Ensure we clear any need flags (as we're currently executing / don't want duplicate calls if two interrupts are spawned close together)
@@ -183,7 +183,7 @@ void HandleQMCInterrupt()
 		// -> that way we can start reading the data and just read the first register after the data (the STATUS one)
 		// to get if there was an overflow. Not ideal, but best barring the additional state logic/complications + bus
 		// utilization of performing separate reads.
-		HAL_StatusTypeDef Status = HAL_I2C_Mem_Read_IT(imuI2CHandle, QMC_ADDR, 0x00, 1, qmcDataBuffer, 7);
+		HAL_StatusTypeDef Status = HAL_I2C_Mem_Read_DMA(imuI2CHandle, QMC_ADDR, 0x00, 1, qmcDataBuffer, 7);
 		if (Status == HAL_OK)
 		{
 			// Ensure we clear any need flags (as we're currently executing / don't want duplicate calls if two interrupts are spawned close together)
