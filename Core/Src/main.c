@@ -582,7 +582,7 @@ void HAL_I2C_AbortCpltCallback (I2C_HandleTypeDef *hi2c)
 #define SYNC_PATTERN_B 0x8C
 #define SYNC_PATTERN_SIZE 2 // Helper function to aovid hard-coding the two in
 
-// Basic !BLOCKING! transmit function
+
 void SendPacket(uint8_t pktId, void *data, uint16_t dataSize)
 {
 	// Create a temporary buffer to store the message in
@@ -622,8 +622,8 @@ void SendPacket(uint8_t pktId, void *data, uint16_t dataSize)
 	uint16_t checksum = crcFast(&packet[SYNC_PATTERN_SIZE], sizeof(pktId)+sizeof(dataSize)+dataSize);
 	*((uint16_t*)&packet[packetSize-sizeof(uint16_t)]) = checksum;
 
-	// Transmit the packet (in a blocking way)
-	HAL_UART_Transmit(&huart1, packet, packetSize, 100);
+	// Transmit the packet
+	HAL_UART_Transmit_DMA(&huart1, packet, packetSize);
 
 	// Free the packet buffer to avoid leaking
 	free(packet);
