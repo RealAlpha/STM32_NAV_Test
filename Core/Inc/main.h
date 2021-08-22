@@ -32,11 +32,25 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdbool.h>
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
+typedef struct
+{
+	// Contains only the relevant/slightly processed GPS params
+	bool bValidFix;
+	float latitude;
+	float longitude;
+	float height;
+	float vN;
+	float vE;
+	float vD;
+	float hAcc;
+	float vAcc;
+	float sAcc;
+} GPSPacket;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -74,6 +88,7 @@ void Error_Handler(void);
 #define ACCEL_PACKET_ID 0
 #define GYRO_PACKET_ID 1
 #define MAG_PACKET_ID 2
+#define GPS_PACKET_ID 3
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

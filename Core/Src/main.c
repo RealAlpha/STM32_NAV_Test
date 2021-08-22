@@ -115,18 +115,15 @@ int main(void)
   MX_USART2_UART_Init();
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
-  initCompleted = true;
-  ///HAL_UART_DMAPause(&huart2);
-  // TODO: Re-enable GPS
-  //HAL_Delay(1000);
-  //PerformProtoNegotiation(&huart2, 9600, 115200);
-  //HAL_Delay(1000);
 
-  ///HAL_UART_DMAResume(&huart2);
-  //UpdateBaudRate(&huart2, 9600);
-  HAL_Delay(1000);
+  // Turn off the GPS fix status LED
+  HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
+
+  // Initialize the GPS module and configure it to use the higher baudrate/UBX protocol
+  // NOTE: Innitial delay is to give the sensor bus some time to start up / testing showed the GPS module needs ~1-2 seconds to start up before we can talk to it/configure it
+  HAL_Delay(2000);
+  PerformProtoNegotiation(&huart2, 9600, 115200);
   HAL_StatusTypeDef StartListenResult = HAL_UARTEx_ReceiveToIdle_DMA(&huart2, GPSBuffer, GPS_BUFFER_SIZE);
-  //HAL_UARTEx_ReceiveToIdle_IT(&huart1, Buffer, GPS_BUFFER_SIZE);//HAL_UARTEx_ReceiveToIdle_DMA(&huart1, GPSBuffer, GPS_BUFFER_SIZE);
 
 /*
   uint8_t Buffer[25] = {0};
@@ -154,17 +151,17 @@ int main(void)
 
 
   PerformImuConfiguration(&hi2c1, 3200, 3200);
-
   unsigned long int last_iTOW = 0;
-
   char buffer[SERIAL_BUFFER_SIZE];
+
+  // Completed setup!
+  initCompleted = true;
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  int curBufferPos = 0;
 	  /*
 	  // TODO: Not ideal//replace with more robust alternative
 	  // Pretty much catches case when no update is available for 1x
@@ -188,29 +185,43 @@ int main(void)
 		  }
 	  }*/
 
-	  // Turn the second built-in LED on when a successful (new)GNSS fix was found
-	  // NOTE: Assuming iTOW is unique among all (valid) new fixes!
-	  // TODO: Switch to some form of update flag like IMU code?
-	  /*
-	  if (lastNavFix.flags & NAV_PVT_FLAGS_OKFIX && lastNavFix.fixType == 3 && GPSUpdateFlags & GPS_UPDATE_AVAILABLE)
+	  // Turn the second built-in LED on when a successful (new) valid GNSS fix was found
+	  if (GPSUpdateFlags & GPS_UPDATE_AVAILABLE)
 	  {
-		  // NOTE: iTOW check is in this nested if to allow that status LED to still funnction properly (rather than blinnking when a GPS message is fixed)
-		  if (lastNavFix.iTOW != last_iTOW)
+		  // Was this fix valid?
+		  if (lastNavFix.flags & NAV_PVT_FLAGS_OKFIX && lastNavFix.fixType == 3)
 		  {
-			  char buffer[256];
-			  snprintf(buffer, 256, "dev:GPS,lat:%f,lon:%f,h:%f,vN:%f,vE:%f,vD:%f,hacc:%f,vacc:%f,sacc:%f,fix:%i,iTOW:%i\n", (float)lastNavFix.lat*powf(10, -7), lastNavFix.lon*powf(10, -7), lastNavFix.height*powf(10, -3), lastNavFix.velN*powf(10, -3), lastNavFix.velD*powf(10, -3), lastNavFix.velD*powf(10, -3), lastNavFix.hAcc*powf(10, -3), lastNavFix.vAcc*powf(10, -3), lastNavFix.sAcc*powf(10, -3), lastNavFix.fixType, lastNavFix.iTOW);
-			  HAL_UART_Transmit(&huart2, buffer, strlen(buffer), 100);
-			  last_iTOW = lastNavFix.iTOW;
+			  // Valid fix! Turn the fix light on
+			  HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
+
+			  // Copy the relevant data to our GPS packet and send it
+			  GPSPacket gpsPacket;
+			  gpsPacket.bValidFix = true;
+			  gpsPacket.latitude = lastNavFix.lat*powf(10, -7);
+			  gpsPacket.longitude = lastNavFix.lon*powf(10, -7);
+			  gpsPacket.height = lastNavFix.height*powf(10, -3);
+			  gpsPacket.vN = lastNavFix.velN*powf(10, -3);
+			  gpsPacket.vE = lastNavFix.velE*powf(10, -3);
+			  gpsPacket.vD = lastNavFix.velD*powf(10, -3);
+			  gpsPacket.hAcc = lastNavFix.hAcc*powf(10, -3);
+			  gpsPacket.vAcc =lastNavFix.vAcc*powf(10, -3);
+			  gpsPacket.sAcc = lastNavFix.sAcc*powf(10, -3);
+			  SendPacket(GPS_PACKET_ID, (void*)&gpsPacket, sizeof(gpsPacket));
 		  }
+		  else
+		  {
+			  // Invalid fix! Turn the fix light off
+			  HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
+
+			  // Send a packet telling the listener that we don't currently have a valid GPS fix
+			  GPSPacket gpsPacket;
+			  gpsPacket.bValidFix = false;
+			  SendPacket(GPS_PACKET_ID, (void*)&gpsPacket, sizeof(gpsPacket));
+		  }
+
+		  // Reset the fix available flag
 		  GPSUpdateFlags &= ~GPS_UPDATE_AVAILABLE;
-		  HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
 	  }
-	  else
-	  {
-		  //HAL_UART_Transmit(&huart2, "NO FIX!\n", strlen("NO FIX!\n"), 100);
-		  HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
-	  }
-	  */
 
 	  if (imuUpdateFlag & ACCEL_AVAILABLE_FLAG)
 	  {
@@ -370,7 +381,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 1.0447968*115200;
+  huart2.Init.BaudRate = 1.0447968*9600;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -480,7 +491,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
 	// Is this message relevant to the UART connenction used for GPS traffic? If so, pass it along to the GPS handler for further processinng.
 	// NOTE: Assuming only one (global) huart instance exists -> the address will be the same, and functions as an equals check between the two objects.
-	if (huart == &huart1)
+	if (huart == &huart2)
 	{
 		ProcessGPSBuffer(Size);
 	}
